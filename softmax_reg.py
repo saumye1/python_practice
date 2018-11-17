@@ -12,7 +12,7 @@ Xtrain = data['data']
 Ytrain = data['labels']
 classes = 10
 features = Xtrain.shape[1]
-W = np.random.randn(classes, features) * 0.001
+W = np.random.randn(classes, features) * 0.0001
 
 print '==============Program starts here=============='
 print 'Xtrain ranges', np.min(Xtrain), np.max(Xtrain)
@@ -38,10 +38,10 @@ def softmaxLoss(W, Xtrain, Ytrain):
     ''' Let Ytrain be n sized vector with correct labels.
         for each of images
     '''
-    hyp = hypothesis(Xtrain, W)
+    hyp = hypothesis(Xtrain, W)#classes * n
     num = hyp[Ytrain, np.arange(Ytrain.__len__())]
     denom = np.sum(hyp, 0)
-    return np.sum(-1 * np.log(num / denom))
+    return np.sum(-1 * np.log(num / denom)) / hyp.shape[1]
 
 def analyticalGradient(W, Xtrain, Ytrain):
     ''' W => classes * features(number of pixels in image)
@@ -53,31 +53,28 @@ def analyticalGradient(W, Xtrain, Ytrain):
     '''
     print 'Accuracy = ', np.mean( np.argmax(W.dot(Xtrain.T), 0) == Ytrain ) * 100
     gradient = np.zeros(W.shape)
-    it = np.nditer(W, flags=['multi_index'], op_flags=['readwrite'])
-
+    classes = W.shape[0]
+    n = Xtrain.shape[0]
     Z = W.dot(Xtrain.T)#10*n, each column image, each row each class
     Z -= np.max(Z)#To avoid computational overflow
-    denom = np.sum(np.exp(Z), 0)
-    while not it.finished:
-        iw = it.multi_index
-        x = iw[0]; z = iw[1]
-        num = np.exp(Z[x,:].T)
-        gr = Xtrain[:, z] * ( ( num / denom) - 1 * (Ytrain == x) )
-        gradient[iw] = np.sum( gr )
-        it.iternext()
+    prob = np.exp(Z) / np.sum(np.exp(Z), 0)
+    exclusion = np.zeros((classes, n))
+    exclusion[Ytrain,np.arange(n)] = 1
+    gradient = (prob - exclusion).dot(Xtrain)
+    gradient /= n
     return gradient
 
 def analyticalGradientDescent(W, Xtrain, Ytrain, steps = 10000):
     #W is a random vector of size classes * features
-    stepSize = 5 * 1e-11
+    stepSize = 1e-7
     for i in range(steps):
+        print 'Iteration#',i
         W = W - stepSize * analyticalGradient(W, Xtrain, Ytrain)
-        print 'Iteration#',i,': loss value =>', softmaxLoss(W, Xtrain, Ytrain)
     return W
 
 #numericalGradient(W, Xtrain, Ytrain)
-analyticalGradientDescent(W, Xtrain, Ytrain)
-W.dump('softmax_reg_trained.dat')
+W = analyticalGradientDescent(W, Xtrain, Ytrain, steps=100)
+#W.dump('softmax_reg_trained.dat')
 
 print 'Final Accuracy = ', np.mean( np.argmax(W.dot(Xtrain.T), 0) == Ytrain ) * 100
 
